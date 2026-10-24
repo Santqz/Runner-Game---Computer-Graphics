@@ -1,0 +1,116 @@
+:root {
+    --color-texto: #ffffff;
+    --color-acento: #ffd23f;
+    --color-boton: #ff595e;
+    --color-boton-sombra: #a8323a;
+    --fondo-pantalla: #393939;
+    --color-background-general: #6ec6ff;
+    --fuente: 'Poppins', sans-serif;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--color-background-general);
+    font-family: var(--fuente);
+    color: var(--color-texto);
+}
+
+/*HUD*/
+#hud {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    right: 16px;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    z-index: 10;
+    pointer-events: none;
+    font-size: 18px;
+    text-shadow: 1px 1px 0px #000;
+}
+
+.hud-item span{
+    display: block;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 8px 12px;
+    border-radius: 8px;
+    pointer-events: auto;
+    text-align: center;
+}
+
+
+/* Pantalla (Inicio, Pausa, Fin) */
+.pantalla {
+   position: fixed;
+   inset: 0;
+   z-index: 20;
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+   justify-content: center;
+   gap: 24px;
+   padding: 16px;
+   text-align: center;
+   background-color: var(--fondo-pantalla);
+}
+
+.pantalla h1 {
+    font-size: clamp(24px, 6vw, 56px);
+    color: var(--color-acento);
+    text-shadow: 4px 4px 0px #000;
+    line-height: 1.3;
+}
+.acento {
+    color: var(--color-boton);
+}
+
+.pista{
+    max-width: 560px;
+    font-size: 15px;
+    line-height: 1.3;
+    opacity: 0.8;
+    color: var(--color-texto);
+}
+
+/* Botón de Jugar */
+button {
+    padding: 12px 24px;
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--color-texto);
+    background-color: var(--color-boton);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 0 var(--color-boton-sombra);
+    transition: transform 0.1s ease-in-out, box-shadow 0.1s ease-in-out;
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 0 var(--color-boton-sombra);
+}
+
+button:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 var(--color-boton-sombra);
+}
+
+.subtitulo {
+    font-size: 14px;
+    line-height: 1.8;
+}
+
+.oculto {
+    display: none !important;
+}
