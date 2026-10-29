@@ -214,22 +214,18 @@ function crearBloque(x,y,tipo,tapado) {
 /* ************************************************** */
 /* JUGADOR (Caballerito)                               */
 /* ************************************************** */
-// Caja de colisión del jugador (en bloques). Mide menos de 1 de alto
 // para que pueda pasar por huecos de un bloque.
 const JUGADOR_ANCHO = 0.6;
 const JUGADOR_ALTO = 0.95;
 
-// La imagen se dibuja en un plano. Si el PNG tiene fondo transparente,
-// alphaTest hace que las partes transparentes no se vean.
 const texJugador = textureLoader.load('./src/img/caballerito.png', (tex) => {
-    // Cuando la imagen termina de cargar, se ajusta el ancho del plano a sus proporciones
     const proporcion = tex.image.width / tex.image.height;
     spriteJugador.scale.x = proporcion * ALTO_SPRITE;
 });
 texJugador.colorSpace = THREE.SRGBColorSpace;
 texJugador.magFilter = THREE.NearestFilter;
 
-const ALTO_SPRITE = 1.0; // alto de la imagen en bloques
+const ALTO_SPRITE = 1.0; 
 const spriteJugador = new THREE.Mesh(
     new THREE.PlaneGeometry(1, 1),
     new THREE.MeshBasicMaterial({ map: texJugador, transparent: true, alphaTest: 0.5 })
@@ -239,12 +235,12 @@ spriteJugador.position.z = 0.51; // justo delante de los bloques para que no se 
 scene.add(spriteJugador);
 
 const jugador = {
-    x: 0, y: 0,      // x = centro, y = pies
+    x: 0, y: 0,     
     vx: 0, vy: 0,
     enSuelo: false,
-    coyote: 0,       // tiempo extra para saltar justo después de salir de un borde
-    buffer: 0,       // recuerda el salto si se presiona W un instante antes de tocar el suelo
-    mirando: 1,      // 1 = derecha, -1 = izquierda
+    coyote: 0,      
+    buffer: 0,      
+    mirando: 1,      
 };
 
 function reaparecer() {
@@ -255,9 +251,8 @@ function reaparecer() {
 }
 
 
-/* ************************************************** */
 /* CONTROLES: W (saltar), A (izquierda), D (derecha)   */
-/* ************************************************** */
+
 const teclas = {};
 
 window.addEventListener('keydown', (e) => {
@@ -267,22 +262,17 @@ window.addEventListener('keydown', (e) => {
 
 window.addEventListener('keyup', (e) => {
     teclas[e.code] = false;
-    // Salto variable: si suelta W mientras sube, el salto se corta
     if (e.code === 'KeyW' && jugador.vy > 0) jugador.vy *= CONFIG.CORTE_SALTO;
 });
 
-// Si la ventana pierde el foco, soltar todas las teclas (evita que camine solo)
 window.addEventListener('blur', () => {
     for (const t in teclas) teclas[t] = false;
 });
 
 
-/* ************************************************** */
-/* FÍSICA Y COLISIONES CON LOS BLOQUES                 */
-/* ************************************************** */
+/* COLISIONES */
 const esSolido = (tx, ty) => bloques.has(clave(tx, ty));
 
-// Mueve un valor hacia un objetivo sin pasarse
 function acercar(valor, objetivo, paso) {
     if (valor < objetivo) return Math.min(valor + paso, objetivo);
     return Math.max(valor - paso, objetivo);
@@ -292,7 +282,6 @@ function moverJugador(dt) {
     const j = jugador;
     const direccion = (teclas.KeyD ? 1 : 0) - (teclas.KeyA ? 1 : 0);
 
-    // --- Horizontal: acelera al presionar, frena con fricción al soltar ---
     if (direccion !== 0) {
         j.vx = acercar(j.vx, direccion * CONFIG.VEL_CAMINAR, CONFIG.ACELERACION * dt);
         j.mirando = direccion;
@@ -302,7 +291,6 @@ function moverJugador(dt) {
     j.x += j.vx * dt;
     colisionHorizontal(j);
 
-    // --- Salto ---
     j.coyote = j.enSuelo ? CONFIG.TIEMPO_COYOTE : j.coyote - dt;
     j.buffer -= dt;
     if (j.buffer > 0 && j.coyote > 0) {
@@ -311,16 +299,13 @@ function moverJugador(dt) {
         j.coyote = 0;
     }
 
-    // --- Vertical: gravedad ---
     j.vy = Math.max(j.vy + CONFIG.GRAVEDAD * dt, CONFIG.VEL_MAX_CAIDA);
     j.y += j.vy * dt;
     colisionVertical(j);
 
-    // Si cae al vacío, vuelve al inicio
     if (j.y < CONFIG.LIMITE_CAIDA) reaparecer();
 }
 
-// Revisa las celdas que toca el lado hacia donde se mueve y lo saca de la pared
 function colisionHorizontal(j) {
     const mitad = JUGADOR_ANCHO / 2;
     const y0 = Math.floor(j.y + 0.01);
@@ -339,7 +324,6 @@ function colisionHorizontal(j) {
     }
 }
 
-// Revisa el piso (si cae) o el techo (si sube)
 function colisionVertical(j) {
     const mitad = JUGADOR_ANCHO / 2;
     const x0 = Math.floor(j.x - mitad + 0.01);
@@ -360,13 +344,10 @@ function colisionVertical(j) {
 }
 
 
-/* ************************************************** */
 /* CÁMARA QUE SIGUE AL JUGADOR                         */
-/* ************************************************** */
 let camX = 0, camY = 0;
 
 function actualizarCamara(dt) {
-    // La cámara va un poco por delante del jugador y lo sigue con suavidad
     const objetivoX = jugador.x + 3;
     const objetivoY = Math.max(jugador.y, 1) + 3;
     const suavizado = Math.min(1, dt * 5);
@@ -378,21 +359,16 @@ function actualizarCamara(dt) {
 }
 
 function dibujarJugador() {
-    // El plano se centra en su mitad, por eso se sube medio alto
     spriteJugador.position.x = jugador.x;
     spriteJugador.position.y = jugador.y + ALTO_SPRITE / 2;
-    // Voltear la imagen cuando camina a la izquierda
     spriteJugador.scale.x = Math.abs(spriteJugador.scale.x) * jugador.mirando;
 }
 
 
-/* ************************************************** */
 /* BUCLE PRINCIPAL                                     */
-/* ************************************************** */
 let ultimoTiempo = null;
 
 function animate(time) {
-    // dt = segundos desde el frame anterior (limitado por si la pestaña se congela)
     const dt = ultimoTiempo === null ? 0 : Math.min((time - ultimoTiempo) / 1000, 1 / 30);
     ultimoTiempo = time;
 
@@ -403,10 +379,8 @@ function animate(time) {
     renderer.render(scene, camera);
 }
 
-// Construir el nivel una sola vez (no dentro de animate)
 construirNivel(nivelActual);
 reaparecer();
-// La cámara empieza ya ubicada sobre el jugador
 camX = jugador.x + 3;
 camY = Math.max(jugador.y, 1) + 3;
 actualizarCamara(0);
