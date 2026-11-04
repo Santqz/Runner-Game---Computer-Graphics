@@ -211,12 +211,9 @@ function crearBloque(x,y,tipo,tapado) {
 }
 
 
-/* ************************************************** */
 /* JUGADOR (Caballerito)                               */
-/* ************************************************** */
-// para que pueda pasar por huecos de un bloque.
-const JUGADOR_ANCHO = 0.6;
-const JUGADOR_ALTO = 0.95;
+const JUGADOR_ANCHO = 0.8;
+const JUGADOR_ALTO = 1;
 
 const texJugador = textureLoader.load('./src/img/caballerito.png', (tex) => {
     const proporcion = tex.image.width / tex.image.height;
