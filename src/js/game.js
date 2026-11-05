@@ -7,7 +7,7 @@
      3.  Escena, cámara, renderizador y luces
      4.  Texturas desde imágenes (TextureLoader + LoadingManager)
      5.  Modelos 3D: jugador, enemigo, bandera
-     6.  Decoración de fondo (capas, parallax, cielo)
+     6.  Decoración de fondo (capas de imágenes con parallax)
      7.  Sonidos (efectos y música)
      8.  Construcción del nivel
      9.  Entrada del teclado
@@ -30,11 +30,11 @@
      index.html
      src/css/style.css
      src/js/game.js      ← este archivo
-     src/img/texture/    ground.jpg, pasto.jpg, ladrillo.jpg (fotos),
-                         suelo-lado.jpg, piedra.jpg, columna.jpg,
-                         sorpresa.jpg, usado.jpg
-     src/img/fondo/      cielo.jpg (opcional, ver sección 6)
-     src/audio/          efectos y música (lista en la sección 7)
+     src/img/texture/    tierra_cueva.png, tierra_cueva_conexion.png,
+                         ladrillos_claros.png, ladrillos_oscuros.png,
+                         sorpresa_activado.png, sorpresa_desactivado.png
+     src/img/fondo/      capa-1-cielo.png ... capa-5-picos.png (ver sección 6)
+     src/css/Sonidos/    efectos y música "Sonido ....mp3" (lista en la sección 7)
    ===================================================================== */
 import * as THREE from 'three';
 
@@ -79,14 +79,14 @@ const CONFIG = {
    ***************************************************** */
 const MAPA_NIVEL = [
   "",
-  "                                                                   ooo                               SS",
-  "          G                                                        BBB                              SSS",
-  "                              oooo                                                                 SSSS",
-  "                              BBBB                    SS   S                                      SSSSS",
-  "        GBGBG                                        SSS   SS     BGBGB          oo   GGG        SSSSSS",
-  "                    C                     C         SSSS   SSS                                  SSSSSSS",
-  "  P            E    C               E E   C    E   SSSSS   SSSS K       E E               E    SSSSSSSS   F",
-  "#########################  #############################   ######################  ###########################",
+  "                                                                                                                       ",
+  "          G                                                                                                               ",
+  "                              oooo                                                                                           ",
+  "                              BBBB                      SS    S                                                                         SS ",
+  "        GBGBG                                          SSS    SS                                                                       SSS",
+  "                    C                     C           SSSS    SSS                       SSS                                           SSSS",
+  "  P            E    C               E E   C    E     SSSSS    SSSS    K                             O       O                        SSSSS            F",
+  "#########################    #############################    ############  ####   ###        ####   #    ###  ##############################################################3",
 ];
 
 // Caracteres SÓLIDOS: el jugador choca con ellos.
@@ -101,13 +101,13 @@ const SOLIDOS = new Set(["#", "B", "G", "S", "C", "U"]);
    3. ESCENA, CÁMARA, RENDERIZADOR Y LUCES
    ===================================================================== */
 const COLOR_CIELO = 0x6ec6ff;
-const COLOR_NIEBLA = 0xc4e8ff;   // azul claro del horizonte
+const COLOR_NIEBLA = 0x26355a;   // azul oscuro de cueva (la sección 6 lo ajusta al color de la imagen)
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(COLOR_CIELO);   // la sección 6 lo cambia por un degradado
+scene.background = new THREE.Color(COLOR_CIELO);   // la sección 6 lo cambia por la imagen de fondo
 // FOG: lo lejano se mezcla con el color del horizonte (da profundidad).
 // Empieza a notarse a 22 unidades de la cámara y a 80 ya es solo niebla,
-// así las montañas del fondo (sección 6) se ven "lejanas" y azuladas.
+// así las montañas del fondo (sección 6) se ven "lejanas" y se funden con la imagen.
 scene.fog = new THREE.Fog(COLOR_NIEBLA, 22, 80);
 
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
@@ -132,12 +132,12 @@ window.addEventListener('resize', () => {
 // LUCES
 // Una AmbientLight sola ilumina todo por igual: no hay sombras ni volumen
 // (los cubos se ven planos). Por eso combinamos dos luces:
-//  - HemisphereLight: luz de relleno, color del cielo arriba y del pasto abajo.
+//  - HemisphereLight: luz de relleno, azul claro arriba y azul oscuro abajo (cueva).
 //  - DirectionalLight: el "sol". Es la única de las dos que proyecta sombras.
-const luzAmbiente = new THREE.HemisphereLight(0xffffff, 0x7caa5c, 2.2);
+const luzAmbiente = new THREE.HemisphereLight(0xd6ecff, 0x1f3a5c, 2.2);
 scene.add(luzAmbiente);
 
-const luzSol = new THREE.DirectionalLight(0xffffff, 2.6);
+const luzSol = new THREE.DirectionalLight(0xe3f1ff, 2.6);
 luzSol.castShadow = true;
 luzSol.shadow.mapSize.set(2048, 2048);     // resolución de la sombra
 luzSol.shadow.camera.left = -22;           // zona que recibe sombras
@@ -198,29 +198,36 @@ function cargarTextura(archivo) {
     // Indica que la imagen está en sRGB. Sin esto los colores se ven lavados.
     textura.colorSpace = THREE.SRGBColorSpace;
     // Filtrado anisotrópico: la textura se ve nítida aunque la cara esté inclinada
-    // respecto a la cámara (por ejemplo, el pasto visto desde arriba en ángulo).
+    // respecto a la cámara (por ejemplo, la cara de arriba del suelo vista en ángulo).
     textura.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    // Para un look pixel-art se usaría: textura.magFilter = THREE.NearestFilter;
-    // Con fotos realistas dejamos el filtro por defecto (LinearFilter), que suaviza.
+    // Las texturas son PIXEL ART: con NearestFilter cada píxel se ve como un
+    // cuadrito nítido. Con el filtro por defecto (LinearFilter) se verían borrosas.
+    textura.magFilter = THREE.NearestFilter;
     return textura;
 }
 
-const texTierra    = cargarTextura('ground.jpg');
+// QUÉ TEXTURA USA CADA BLOQUE (archivos en src/img/texture/)
+//   tierra_cueva.png            tierra con borde claro arriba: lados del bloque de suelo (#)
+//   tierra_cueva_conexion.png   tierra sin borde: cara de arriba del suelo y relleno de abajo
+//   ladrillos_claros.png        bloque que se rompe (B)
+//   ladrillos_oscuros.png       escaleras (S) y columnas (C)
+//   sorpresa_activado.png       bloque "?" sin golpear (G)
+//   sorpresa_desactivado.png    bloque "?" ya golpeado (U)
+const texTierra    = cargarTextura('tierra_cueva_conexion.png');
 // La tierra de relleno es una caja de 1x4: si usamos la imagen una sola vez,
 // se ve estirada 4 veces hacia abajo. Con RepeatWrapping + repeat(1, 4)
 // la imagen se REPITE 4 veces en vertical y conserva su proporción.
+// tierra_cueva_conexion.png empalma consigo misma, así no se notan las uniones.
 // (El navegador guarda la imagen en caché: cargarla dos veces no la descarga dos veces.)
-const texTierraRelleno = cargarTextura('ground.jpg');
+const texTierraRelleno = cargarTextura('tierra_cueva_conexion.png');
 texTierraRelleno.wrapS = THREE.RepeatWrapping;
 texTierraRelleno.wrapT = THREE.RepeatWrapping;
 texTierraRelleno.repeat.set(1, 4);
-const texSuelo     = cargarTextura('pasto.jpg');       // parte de arriba del suelo
-const texSueloLado = cargarTextura('suelo-lado.jpg');  // lados del suelo (ground + borde de pasto)
-const texLadrillo  = cargarTextura('ladrillo.jpg');
-const texSorpresa  = cargarTextura('sorpresa.jpg');
-const texUsado     = cargarTextura('usado.jpg');
-const texPiedra    = cargarTextura('piedra.jpg');
-const texColumna   = cargarTextura('columna.jpg');
+const texSueloLado = cargarTextura('tierra_cueva.png');   // lados del suelo (con borde arriba)
+const texLadrillo  = cargarTextura('ladrillos_claros.png');
+const texSorpresa  = cargarTextura('sorpresa_activado.png');
+const texUsado     = cargarTextura('sorpresa_desactivado.png');
+const texPiedra    = cargarTextura('ladrillos_oscuros.png');
 
 // CREAR LOS MATERIALES
 // MeshLambertMaterial: material sencillo que reacciona a la luz.
@@ -231,7 +238,7 @@ const MATERIALES = {
     suelo: [
         matSueloLado,
         matSueloLado,
-        new THREE.MeshLambertMaterial({ map: texSuelo }),   // arriba: pasto
+        new THREE.MeshLambertMaterial({ map: texTierra }),  // arriba: tierra de cueva
         new THREE.MeshLambertMaterial({ map: texTierra }),  // abajo: tierra
         matSueloLado,
         matSueloLado,
@@ -239,10 +246,10 @@ const MATERIALES = {
     tierra:   new THREE.MeshLambertMaterial({ map: texTierraRelleno }),
     ladrillo: new THREE.MeshLambertMaterial({ map: texLadrillo }),
     // emissive: el bloque "brilla" un poco aunque esté en sombra
-    sorpresa: new THREE.MeshLambertMaterial({ map: texSorpresa, emissive: 0x332200 }),
+    sorpresa: new THREE.MeshLambertMaterial({ map: texSorpresa, emissive: 0x0a2a44 }),
     usado:    new THREE.MeshLambertMaterial({ map: texUsado }),
     piedra:   new THREE.MeshLambertMaterial({ map: texPiedra }),
-    columna:  new THREE.MeshLambertMaterial({ map: texColumna }),
+    columna:  new THREE.MeshLambertMaterial({ map: texPiedra }),   // misma textura que la piedra
     // La gema no usa imagen: un color brillante se ve mejor en un objeto pequeño
     gema:     new THREE.MeshPhongMaterial({ color: 0x26c6da, emissive: 0x0b5560, shininess: 100 }),
 };
@@ -403,30 +410,55 @@ function crearBandera(alto, colorTela) {
 
 /* =====================================================================
    6. DECORACIÓN DE FONDO
-   Paisaje hecho SOLO con primitivas: suelo lejano, árboles, colinas,
-   montañas y nubes. Todo va dentro de "grupoDecoracion", un THREE.Group
+   Paisaje de cueva: 5 capas de imágenes que se repiten sin cortes y,
+   (opcional) delante, capas hechas con primitivas: suelo, árboles (pinos y
+   árboles de cristal), rocas/colinas, montañas con hielo y bruma. Todo va dentro de "grupoDecoracion", un THREE.Group
    separado del nivel: estos objetos NO están en el Map "bloques", así que
    no tienen colisión (el jugador nunca choca con ellos).
 
    CAPAS DE PROFUNDIDAD (Z) Y PARALLAX
      capa        Z              factor parallax
-     árboles     -4 a -10       0     (se ven con la perspectiva normal)
-     colinas     -16 a -26      0.35
-     nubes       -26 a -36      0.5   (además se desplazan solas)
-     montañas    -45 a -58      0.65
+     árboles       -4 a -10     0     (se ven con la perspectiva normal)
+     rocas         -12 a -20    0.25
+     bruma         -20 a -28    0.4   (además se desplaza sola)
+     estalagmitas  -24 a -32    0.45
+     imágenes      5 capas a ~150 de la cámara (se mueven con texture.offset)
+   Las capas de primitivas son bajas y espaciadas para no tapar la imagen.
    "factor" = qué fracción del movimiento de la cámara copia la capa.
    Con 0 la capa se queda quieta; con 1 iría pegada a la cámara (parecería
    infinitamente lejos). Así las capas lejanas se mueven más despacio.
 
-   La niebla (scene.fog, sección 3) mezcla las capas lejanas con el color
-   del horizonte, y el cielo es un degradado dibujado en un <canvas>.
+   FONDO POR CAPAS DE IMÁGENES (parallax)
+     5 imágenes PNG en src/img/fondo/. Las de adelante tienen partes
+     transparentes para que se vean las de atrás:
+       capa-1-cielo.png        luz de la cueva y destellos (la más lejana)
+       capa-2-cristales.png    cristales claros a lo lejos
+       capa-3-estalactitas.png techo con estalactitas + estalagmitas
+       capa-4-bosque.png       pinos y lomas
+       capa-5-picos.png        picos oscuros (la más cercana)
+     Cada capa va en un plano pegado a la cámara (siempre llena la pantalla).
+     Las imágenes están hechas para REPETIRSE SIN COSTURA: el borde derecho
+     continúa exactamente en el izquierdo, así que usamos RepeatWrapping.
+     PARALLAX: cada capa mueve su texture.offset.x a una velocidad distinta;
+     la del cielo casi no se mueve y la de los picos es la más rápida.
 
-   IMAGEN OPCIONAL DEL CIELO: src/img/fondo/cielo.jpg
-   Si USAR_IMAGEN_CIELO es true, se intenta cargar esa imagen como fondo.
-   Si no existe, se queda el degradado.
+   La niebla (scene.fog, sección 3) toma el color promedio del cielo,
+   así las capas de primitivas (si se activan) se funden con el fondo.
    ===================================================================== */
 const RUTA_FONDOS = './src/img/fondo/';
-const USAR_IMAGEN_CIELO = true;
+// Elementos 3D de decoración (árboles, rocas, estalagmitas, bruma) delante de las imágenes.
+// false = solo se ven las imágenes. Ponlo en true para mostrarlos.
+const MOSTRAR_DECORACION_3D = false;
+
+// archivo y velocidad = copias de la imagen que avanza por cada unidad que avanza la cámara
+const CAPAS_IMAGEN = [
+    { archivo: 'capa-1-cielo.png',        velocidad: 0.0015 },
+    { archivo: 'capa-2-cristales.png',    velocidad: 0.004 },
+    { archivo: 'capa-3-estalactitas.png', velocidad: 0.007 },
+    { archivo: 'capa-4-bosque.png',       velocidad: 0.011 },
+    { archivo: 'capa-5-picos.png',        velocidad: 0.016 },
+];
+const DISTANCIA_IMAGEN_FONDO = 150;   // la capa más lejana; cada siguiente va 1 unidad más cerca
 
 // El nivel mide lo que mide su fila más larga
 const ANCHO_NIVEL = Math.max(...MAPA_NIVEL.map(fila => fila.length));
@@ -439,56 +471,120 @@ function aleatorio(min = 0, max = 1) {
     return min + ((semilla - 1) / 2147483646) * (max - min);
 }
 
-// ---------- Cielo con degradado ----------
-// Dibujamos un degradado vertical en un canvas y lo usamos como textura.
-// Abajo termina en COLOR_NIEBLA para que el horizonte se funda con la niebla.
-function crearCieloDegradado() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 2;
-    canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-    const degradado = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    degradado.addColorStop(0, '#3a8ee0');      // arriba: azul intenso
-    degradado.addColorStop(0.3, '#8fd0ff');
-    degradado.addColorStop(0.42, '#' + new THREE.Color(COLOR_NIEBLA).getHexString()); // horizonte
-    degradado.addColorStop(1, '#' + new THREE.Color(COLOR_NIEBLA).getHexString());
-    ctx.fillStyle = degradado;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const textura = new THREE.CanvasTexture(canvas);
-    textura.colorSpace = THREE.SRGBColorSpace;
-    return textura;
-}
-scene.background = crearCieloDegradado();
+// ---------- Planos de las capas ----------
+// MeshBasicMaterial: muestra la imagen con sus colores reales (no le afecta la luz).
+// fog: false → la niebla no las tapa aunque estén muy lejos.
+// transparent: true → respeta las partes transparentes del PNG.
+const planosFondo = CAPAS_IMAGEN.map((capa, i) => {
+    const material = new THREE.MeshBasicMaterial({
+        fog: false,
+        depthWrite: false,
+        transparent: i > 0,          // el cielo es opaco; las demás tienen huecos
+    });
+    const plano = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+    plano.position.z = -(DISTANCIA_IMAGEN_FONDO - i);   // la capa 1 atrás, la 5 adelante
+    plano.renderOrder = -10 + i;                         // se dibujan en orden: de atrás hacia adelante
+    plano.visible = false;                               // hasta que cargue su imagen
+    plano.userData.velocidad = capa.velocidad;
+    camera.add(plano);   // hijo de la cámara: se mueve y gira con ella
+    return plano;
+});
+scene.add(camera);   // los hijos de la cámara solo se dibujan si la cámara está en la escena
 
-if (USAR_IMAGEN_CIELO) {
-    // Cargador aparte (sin el LoadingManager): si la imagen falta,
-    // el botón JUGAR no se queda esperando y el degradado sigue.
-    new THREE.TextureLoader().load(
-        RUTA_FONDOS + 'cielo.jpg',
+// Ajusta cada plano para que llene la pantalla y la imagen NO se estire
+function ajustarPlanoFondo() {
+    planosFondo.forEach(plano => {
+        const distancia = -plano.position.z;
+        const alto = 2 * distancia * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+        const ancho = alto * camera.aspect;
+        plano.scale.set(ancho * 1.02, alto * 1.02, 1);   // 2 % extra para que no se vean bordes
+
+        const textura = plano.material.map;
+        if (textura && textura.image) {
+            // Cuántas copias de la imagen caben a lo ancho de la pantalla
+            const proporcionImagen = textura.image.width / textura.image.height;
+            textura.repeat.set(camera.aspect / proporcionImagen, 1);
+        }
+    });
+}
+window.addEventListener('resize', ajustarPlanoFondo);
+
+// Color promedio de la franja central de una imagen → color de la niebla
+function colorPromedio(imagen) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 32;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(imagen, 0, 0, 32, 32);
+    const datos = ctx.getImageData(0, 10, 32, 14).data;   // filas del medio (horizonte)
+    let r = 0, g = 0, b = 0;
+    for (let i = 0; i < datos.length; i += 4) { r += datos[i]; g += datos[i + 1]; b += datos[i + 2]; }
+    const n = datos.length / 4;
+    return new THREE.Color().setRGB(r / n / 255, g / n / 255, b / n / 255, THREE.SRGBColorSpace);
+}
+
+// Cargador aparte (sin el LoadingManager): si falta una imagen, el botón
+// JUGAR no se queda esperando y el juego sigue sin esa capa.
+scene.background = scene.fog.color;
+const cargadorFondo = new THREE.TextureLoader();
+CAPAS_IMAGEN.forEach((capa, i) => {
+    cargadorFondo.load(
+        RUTA_FONDOS + capa.archivo,
         (textura) => {
             textura.colorSpace = THREE.SRGBColorSpace;
-            scene.background = textura;
+            textura.wrapS = THREE.RepeatWrapping;        // se repite: las imágenes empalman sin costura
+            textura.wrapT = THREE.ClampToEdgeWrapping;
+            textura.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            const plano = planosFondo[i];
+            plano.material.map = textura;
+            plano.material.needsUpdate = true;
+            plano.visible = true;
+            ajustarPlanoFondo();
+            if (i === 0) scene.fog.color.copy(colorPromedio(textura.image));
         },
         undefined,
-        () => console.warn('No se encontró src/img/fondo/cielo.jpg: se usa el cielo con degradado.')
+        () => console.warn(`No se encontró ${RUTA_FONDOS}${capa.archivo}: el juego sigue sin esa capa.`)
     );
-}
+});
 
 // ---------- Materiales de la decoración (compartidos) ----------
 // flatShading: cada cara se pinta de un solo tono → look "low poly"
+// Paleta de "cueva de cristal" para que combine con la imagen de fondo.
+// emissive: los cristales brillan un poco aunque estén en sombra.
 const MAT_DECO = {
-    sueloLejano: new THREE.MeshLambertMaterial({ color: 0x86c96f }),
-    tronco:      new THREE.MeshLambertMaterial({ color: 0x7a5232, flatShading: true }),
-    pino:        new THREE.MeshLambertMaterial({ color: 0x2f8f4e, flatShading: true }),
-    copa:        new THREE.MeshLambertMaterial({ color: 0x4fae4a, flatShading: true }),
-    colinas: [0x6fbf5a, 0x5aa950, 0x7fcf6a].map(c =>
+    // El suelo lejano se desvanece con la distancia (alphaMap, ver crearDesvanecido)
+    sueloLejano: new THREE.MeshLambertMaterial({ color: 0x1e2a44, transparent: true }),
+    tronco:      new THREE.MeshLambertMaterial({ color: 0x3a2f45, flatShading: true }),
+    pino:        new THREE.MeshLambertMaterial({ color: 0x1f4a5e, flatShading: true }),
+    copa:        new THREE.MeshLambertMaterial({ color: 0x6fd3ff, emissive: 0x1a5a7a, flatShading: true }),
+    colinas: [0x2b3a5c, 0x34476b, 0x26324f].map(c =>
                  new THREE.MeshLambertMaterial({ color: c, flatShading: true })),
-    montana:     new THREE.MeshLambertMaterial({ color: 0x7d8fa8, flatShading: true }),
-    nieve:       new THREE.MeshLambertMaterial({ color: 0xf4f8ff, flatShading: true }),
-    nube:        new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x777777 }),
+    montana:     new THREE.MeshLambertMaterial({ color: 0x303c5e, flatShading: true }),
+    nieve:       new THREE.MeshLambertMaterial({ color: 0x9fe6ff, emissive: 0x2a6f8f, flatShading: true }),
+    nube:        new THREE.MeshLambertMaterial({ color: 0x9aa3d6, emissive: 0x30355a, transparent: true, opacity: 0.45 }),
 };
 
+// alphaMap: textura en escala de grises que dice qué tan opaco es cada punto
+// (blanco = opaco, negro = invisible). El suelo es opaco cerca y se vuelve
+// transparente al fondo, para que se vea el piso de la imagen.
+function crearDesvanecido() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 2;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    const degradado = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    degradado.addColorStop(0, '#000');     // arriba del canvas = lo más lejano del plano
+    degradado.addColorStop(0.35, '#000');
+    degradado.addColorStop(0.8, '#fff');
+    degradado.addColorStop(1, '#fff');      // abajo = lo más cercano al nivel
+    ctx.fillStyle = degradado;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    return new THREE.CanvasTexture(canvas);
+}
+MAT_DECO.sueloLejano.alphaMap = crearDesvanecido();
+
 const grupoDecoracion = new THREE.Group();
+grupoDecoracion.visible = MOSTRAR_DECORACION_3D;   // si es false, no se dibuja nada de este grupo
 scene.add(grupoDecoracion);
 
 const capasFondo = [];   // { grupo, factor }
@@ -537,7 +633,7 @@ function crearArbol(x, z, escala) {
     return arbol;
 }
 
-// ---------- Tipo 2: Colinas (medias esferas aplastadas) ----------
+// ---------- Tipo 2: Rocas (medias esferas aplastadas) ----------
 function crearColina(x, z, radio) {
     // thetaLargo = PI/2 → solo la mitad de arriba de la esfera
     const colina = new THREE.Mesh(
@@ -549,13 +645,13 @@ function crearColina(x, z, radio) {
     return colina;
 }
 
-// ---------- Tipo 3: Montañas (conos de pocas caras con nieve en la punta) ----------
+// ---------- Tipo 3: Estalagmitas (conos delgados con punta de hielo) ----------
 function crearMontana(x, z, radio, alto) {
     const montana = new THREE.Group();
     const caras = 5;
     const cuerpo = new THREE.Mesh(new THREE.ConeGeometry(radio, alto, caras), MAT_DECO.montana);
     cuerpo.position.y = alto / 2;
-    // La nieve es un cono con la MISMA inclinación (30 % del tamaño) en la punta
+    // La punta de hielo es un cono con la MISMA inclinación (30 % del tamaño)
     const nieve = new THREE.Mesh(new THREE.ConeGeometry(radio * 0.3 * 1.03, alto * 0.3, caras), MAT_DECO.nieve);
     nieve.position.y = alto - (alto * 0.3) / 2 + 0.02;
     montana.add(cuerpo, nieve);
@@ -564,14 +660,14 @@ function crearMontana(x, z, radio, alto) {
     return montana;
 }
 
-// ---------- Tipo 4: Nubes (grupo de esferas) ----------
+// ---------- Tipo 4: Bruma (grupo de esferas semitransparentes) ----------
 function crearNube(x, y, z) {
     const nube = new THREE.Group();
     const bolitas = 3 + Math.floor(aleatorio(0, 3));
     for (let i = 0; i < bolitas; i++) {
-        const r = aleatorio(0.9, 1.6);
+        const r = aleatorio(0.6, 1.1);
         const bolita = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), MAT_DECO.nube);
-        bolita.position.set(i * 1.3 - bolitas * 0.6, aleatorio(-0.2, 0.4), aleatorio(-0.3, 0.3));
+        bolita.position.set(i * 0.9 - bolitas * 0.45, aleatorio(-0.2, 0.3), aleatorio(-0.3, 0.3));
         bolita.scale.y = 0.75;
         nube.add(bolita);
     }
@@ -579,15 +675,16 @@ function crearNube(x, y, z) {
     return nube;
 }
 
-// Suelo lejano: un plano verde enorme detrás del nivel. Sigue a la cámara
-// en X, así que nunca se le ve el borde; la niebla lo funde con el horizonte.
-const sueloLejano = new THREE.Mesh(new THREE.PlaneGeometry(500, 160), MAT_DECO.sueloLejano);
+// Suelo lejano: un plano oscuro detrás del nivel. Sigue a la cámara en X,
+// así que nunca se le ve el borde; al fondo se desvanece y deja ver la imagen.
+const sueloLejano = new THREE.Mesh(new THREE.PlaneGeometry(500, 40), MAT_DECO.sueloLejano);
 sueloLejano.rotation.x = -Math.PI / 2;            // acostado (mirando hacia arriba)
-sueloLejano.position.set(0, Y_SUELO_FONDO, -81);  // va de z = -1 a z = -161
+sueloLejano.position.set(0, Y_SUELO_FONDO, -21);  // va de z = -1 a z = -41
 grupoDecoracion.add(sueloLejano);
 
 // Se llama UNA vez al cargar la página (no en cada partida ni en cada cuadro)
 function construirDecoracion() {
+    if (!MOSTRAR_DECORACION_3D) return;   // solo imagen de fondo: no creamos los objetos 3D
     // Capa cercana: árboles (factor 0 = quietos)
     const capaArboles = crearCapa(0);
     let [x, xMax] = rangoCapa(0, 15);
@@ -596,29 +693,29 @@ function construirDecoracion() {
         x += aleatorio(3, 7);
     }
 
-    // Capa media: colinas
-    const capaColinas = crearCapa(0.35);
-    [x, xMax] = rangoCapa(0.35, 30);
+    // Capa media: rocas
+    const capaRocas = crearCapa(0.25);
+    [x, xMax] = rangoCapa(0.25, 25);
     while (x < xMax) {
-        capaColinas.add(crearColina(x, aleatorio(-26, -16), aleatorio(5, 9)));
-        x += aleatorio(6, 11);
+        capaRocas.add(crearColina(x, aleatorio(-20, -12), aleatorio(2, 3.5)));
+        x += aleatorio(6, 12);
     }
 
-    // Capa de nubes (también se mueven solas hacia la derecha)
-    const capaNubes = crearCapa(0.5);
-    const [nMin, nMax] = rangoCapa(0.5, 40);
-    for (x = nMin; x < nMax; x += aleatorio(9, 16)) {
-        const nube = crearNube(x, aleatorio(10, 16), aleatorio(-36, -26));
+    // Capa de bruma (también se mueve sola hacia la derecha)
+    const capaNubes = crearCapa(0.4);
+    const [nMin, nMax] = rangoCapa(0.4, 35);
+    for (x = nMin; x < nMax; x += aleatorio(18, 30)) {
+        const nube = crearNube(x, aleatorio(9, 12), aleatorio(-28, -20));
         capaNubes.add(nube);
-        nubes.push({ malla: nube, velocidad: aleatorio(0.3, 0.9), xMin: nMin, xMax: nMax });
+        nubes.push({ malla: nube, velocidad: aleatorio(0.3, 0.8), xMin: nMin, xMax: nMax });
     }
 
-    // Capa lejana: montañas
-    const capaMontanas = crearCapa(0.65);
-    [x, xMax] = rangoCapa(0.65, 55);
+    // Capa lejana: estalagmitas delgadas y separadas (dejan ver la imagen)
+    const capaEstalagmitas = crearCapa(0.45);
+    [x, xMax] = rangoCapa(0.45, 35);
     while (x < xMax) {
-        capaMontanas.add(crearMontana(x, aleatorio(-58, -45), aleatorio(8, 13), aleatorio(12, 20)));
-        x += aleatorio(9, 15);
+        capaEstalagmitas.add(crearMontana(x, aleatorio(-32, -24), aleatorio(0.9, 1.6), aleatorio(4, 8)));
+        x += aleatorio(9, 16);
     }
 }
 
@@ -626,6 +723,10 @@ function construirDecoracion() {
 function actualizarFondo(dt, enMovimiento) {
     capasFondo.forEach(capa => { capa.grupo.position.x = camera.position.x * capa.factor; });
     sueloLejano.position.x = camera.position.x;
+    // Cada capa de imagen avanza a su propia velocidad (las lejanas más despacio)
+    planosFondo.forEach(plano => {
+        if (plano.material.map) plano.material.map.offset.x = camera.position.x * plano.userData.velocidad;
+    });
 
     if (!enMovimiento) return;   // en pausa las nubes se quedan quietas
     nubes.forEach(n => {
@@ -647,27 +748,31 @@ function actualizarFondo(dt, enMovimiento) {
    nada al cargar: todo se crea en iniciarAudio(), que se llama en el
    primer clic o la primera tecla. Así tampoco aparecen avisos en la consola.
 
-   ARCHIVOS (carpeta src/audio/). Si alguno falta, el juego sigue sin ese sonido.
+   ARCHIVOS (carpeta src/css/Sonidos/). Si alguno falta, el juego sigue sin ese sonido.
+
+   MÚSICA DE FONDO: suena en bucle mientras se juega (también en pausa y
+   mientras el jugador pierde una vida). Se detiene en la pantalla de
+   inicio y en la pantalla final (Game Over / Nivel completado).
    ===================================================================== */
-const RUTA_AUDIO = './src/audio/';
+const RUTA_AUDIO = './src/css/Sonidos/';
 
 // nombre: [archivo, volumen 0-1]
+// Los nombres de archivo tienen espacios; encodeURI() los convierte a %20
+// al armar la URL, así el navegador los encuentra sin problema.
 const ARCHIVOS_EFECTOS = {
-    salto:        ['salto.mp3', 0.5],
-    golpe:        ['golpe-martillo.mp3', 0.6],
-    romperBloque: ['romper-bloque.mp3', 0.6],
-    gema:         ['gema.mp3', 0.5],
-    enemigo:      ['enemigo-derrotado.mp3', 0.7],
-    perderVida:   ['perder-vida.mp3', 0.7],
-    puntoControl: ['punto-control.mp3', 0.6],
-    vidaExtra:    ['vida-extra.mp3', 0.7],
-    victoria:     ['victoria.mp3', 0.8],
-    gameOver:     ['game-over.mp3', 0.8],
+    golpe:        ['Sonido Ataque.mp3', 0.6],    // el jugador lanza un golpe
+    romperBloque: ['Sonido Bloque.mp3', 0.6],    // el jugador rompe un bloque
+    enemigo:      ['Sonido Enemigo.mp3', 0.7],   // el jugador mata un enemigo
+    gema:         ['Sonido Gema.mp3', 0.5],      // el jugador recoge una gema (o golpea un "?")
+    perderVida:   ['Sonido Muerte.mp3', 0.7],    // el jugador pierde una vida
+    salto:        ['Sonido Salto.mp3', 0.5],     // el jugador salta
 };
 const ARCHIVOS_MUSICA = {
-    menu:  ['musica-menu.mp3', 0.35],
-    juego: ['musica-juego.mp3', 0.3],
+    juego: ['Sonido Fondo.mp3', 0.3],            // música de fondo en bucle
 };
+// Nota: el código también llama a sonar('puntoControl'), sonar('vidaExtra'),
+// sonar('victoria') y sonar('gameOver'). Como no están en la lista, no suenan
+// (sonar() simplemente no hace nada). Si luego tienes esos audios, agrégalos aquí.
 
 let oyente = null;            // AudioListener (se crea en la primera interacción)
 const efectos = {};           // nombre -> THREE.Audio
@@ -692,11 +797,11 @@ function iniciarAudio() {
         audio.setLoop(enBucle);
         destino[nombre] = audio;
         cargador.load(
-            RUTA_AUDIO + archivo,
+            RUTA_AUDIO + encodeURI(archivo),
             (buffer) => {
                 audio.setBuffer(buffer);
                 // Si es la música que toca ahora, empieza en cuanto llega
-                if (enBucle && nombre === musicaActual && estado !== 'pausa') audio.play();
+                if (enBucle && nombre === musicaActual) audio.play();
             },
             undefined,
             () => console.warn(`Falta el audio ${RUTA_AUDIO + archivo}: el juego sigue sin ese sonido.`)
@@ -729,16 +834,6 @@ function detenerMusica() {
     const musica = musicas[musicaActual];
     if (musica && musica.isPlaying) musica.stop();
     musicaActual = null;
-}
-
-// pause() recuerda en qué segundo iba; play() continúa desde ahí
-function pausarMusica() {
-    const musica = musicas[musicaActual];
-    if (musica && musica.isPlaying) musica.pause();
-}
-function reanudarMusica() {
-    const musica = musicas[musicaActual];
-    if (musica && musica.buffer && !musica.isPlaying) musica.play();
 }
 
 // Tecla M: silenciar / activar todo el sonido
@@ -1504,11 +1599,10 @@ function alternarPausa() {
     if (estado === 'jugando') {
         estado = 'pausa';
         ui.pausa.classList.remove('oculto');
-        pausarMusica();
+        // la música de fondo sigue sonando en pausa
     } else if (estado === 'pausa') {
         estado = 'jugando';
         ui.pausa.classList.add('oculto');
-        reanudarMusica();
         reloj.getDelta(); // descartamos el tiempo que pasó en pausa
     }
 }
@@ -1522,12 +1616,9 @@ function ganarNivel() {
 function terminarJuego(gano, bonus = 0) {
     estado = gano ? 'victoria' : 'gameover';
     actualizarHUD();
-    // Paramos la música del nivel, suena el efecto final y luego vuelve la del menú
+    // En la pantalla final no hay música de fondo
     detenerMusica();
     sonar(gano ? 'victoria' : 'gameOver');
-    setTimeout(() => {
-        if (estado === 'victoria' || estado === 'gameover') reproducirMusica('menu');
-    }, 3000);
     ui.finTitulo.textContent = gano ? '¡NIVEL COMPLETADO!' : 'GAME OVER';
     ui.finDetalle.innerHTML = gano
         ? `Puntos: ${puntos}<br>Gemas: ${gemasRecogidas}<br>Bono por tiempo: ${bonus}`
@@ -1579,7 +1670,6 @@ function animate() {
 // ---------- Arranque ----------
 ui.inicio.classList.remove('oculto');   // mostramos el menú de inicio
 construirDecoracion();         // el paisaje se crea UNA sola vez
-reproducirMusica('menu');      // queda "pedida": empieza tras el primer clic o tecla (sección 7)
 construirNivel();              // el nivel se ve de fondo en la pantalla de inicio
 reaparecerJugador();
 actualizarModeloJugador(0);
