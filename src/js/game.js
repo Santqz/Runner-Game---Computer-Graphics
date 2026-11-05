@@ -82,11 +82,11 @@ const MAPA_NIVEL = [
   "                                                                                                                       ",
   "          G                                                                                                               ",
   "                              oooo                                                                                           ",
-  "                              BBBB                      SS    S                                                                         SS ",
-  "        GBGBG                                          SSS    SS                                                                       SSS",
-  "                    C                     C           SSSS    SSS                       SSS                                           SSSS",
-  "  P            E    C               E E   C    E     SSSSS    SSSS    K                             O       O                        SSSSS            F",
-  "#########################    #############################    ############  ####   ###        ####   #    ###  ##############################################################3",
+  "                              BBBB                      SS    S                                                                         SS",
+  "        GBGBG                                          SSS    SS                           E                                           SSS",
+  "                    C                     C           SSSS    SSS                        SSS                                          SSSS",
+  "  P            E    C               E E   C    E     SSSSS    SSSS    K        E                    o       0        E               SSSSS          F",
+  "#########################    #############################    ############  ####   ###         ####   #    ###  ###############################################",
 ];
 
 // Caracteres SÓLIDOS: el jugador choca con ellos.
